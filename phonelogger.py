@@ -15,12 +15,16 @@ def main():
            if opcode != 0: # Skip KeepaliveAck
                print("Written: %s(%x), length:%d" %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
 
+    def handle_tone(ssh, index, child_result_list):
+       if ssh.match:
+           tone = int(ssh.match.group(2))
+           print('%s Tone: %s(%x), direction:%s' %(ssh.match.group(1).decode('utf-8'), sccp.lookup_tone(tone), tone, ssh.match.group(3).decode('utf-8')))
+
     events = {
         re.compile(b'Read Sccp Length: (?P<length>\d+) messageType: (?P<type>0x[0-9a-fA-F]+) avalable:'):handle_read,
         re.compile(b'Writing Sccp Length: (?P<length>\d+) for SCCP MSG: (?P<type>0x[0-9a-fA-F]+)\\n'):handle_write,
         
         # device control
-        #re.compile(b'\[DevRecSm\]: execute(?P<execute>.*), CurState=(?P<curstate>.*)\\n'):'DevStateChange',
         re.compile(b'processSoftkey (?P<SoftkeyIndex>\d) DOWN IN\\n'):'SoftKeyDown',
         re.compile(b'processSoftkey (?P<SoftkeyIndex>\d) DOWN OUT\\n'):'SottKeyUp',
         re.compile(b'Received SOFT: (?P<SoftkeyIndex>\d)\\n'):'SoftKeyPressed',
@@ -34,7 +38,7 @@ def main():
         re.compile(b'setText \( "(?P<Text>.*)" \)\\n'):'StatusPrompt',		# Ring out / Call Proceed / Connected / Your current options
         
         # call control
-        re.compile(b'Tone-AUDIBLE FEEDBACK: (?P<State>.*):\(ToneType: (?P<Type>\d+), ToneDir: (?P<Direction>\d+)\)\\n'):'tone',
+        re.compile(b'Tone-AUDIBLE FEEDBACK: (?P<State>.*):\(ToneType: (?P<Type>\d+), ToneDir: (?P<Direction>\d+)\)\\n'):handle_tone,
         re.compile(b'callState - CALL STATE IS(?P<State>\S*)\\n'):'callstate',
         re.compile(b'Call View: Call-(?P<CallNum>\d+) draw\\n'):'CallView',
         
