@@ -1,17 +1,25 @@
+#!/usr/bin/env python3
 import requests
 
-def httppush(ip, uri, username, password):
-  try:
-    xml = "<CiscoIPPhoneExecute><ExecuteItem Priority=\"0\" URL=\"%s\"/></CiscoIPPhoneExecute>" %(uri)
-    url = 'http://%s/CGI/Execute' %(ip)
-    payload = {'XML': xml}
-    headers={"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain", "Connection": "close", "Content-Length": "%d" %len(xml)}
-    auth = (username, password)
-    r = requests.post(url, data=payload, auth=auth, headers=headers)
-    print(r.status_code)
-    print(r.headers)
-    print(r.text)
-  except Exception as e:
-    print e
+URL_EXECUTE = 'http://%(host)s/CGI/Execute'
 
-httppush('10.15.15.205', 'Dial:666', 'cisco', 'cisco')
+PHONE_EXECUTE_HEADER = '''<CiscoIPPhoneExecute>'''
+EXECUTE_ITEM = '''<ExecuteItem Priority="0" URL="%(url)s"/>'''
+PHONE_EXECUTE_FOOTER = '''</CiscoIPPhoneExecute>'''
+
+def create_execute_url(url):
+    push_xml = PHONE_EXECUTE_HEADER + EXECUTE_ITEM % {'url': url} + PHONE_EXECUTE_FOOTER
+    return push_xml
+
+def execute(host, data, user, password, headers={}):
+    url = URL_EXECUTE % {'host' : host}
+    xml = create_execute_url(data)
+    data = 'XML=%s' %xml
+    r = requests.post(url, data, auth=(user, password), headers=headers)
+    print(r.content.decode('utf-8'))
+                        
+if __name__ == '__main__':
+    import sys
+    host = sys.argv[1]
+    data = sys.argv[2]
+    execute(host, data, 'cisco', 'cisco')
