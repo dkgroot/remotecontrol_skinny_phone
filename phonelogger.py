@@ -20,14 +20,14 @@ def main():
         re.compile(b'Writing Sccp Length: (?P<length>\d+) for SCCP MSG: (?P<type>0x[0-9a-fA-F]+)\\n'):handle_write,
         
         # device control
-        re.compile(b'\[DevRecSm\]: execute(?P<execute>.*), CurState=(?P<curstate>.*)\\n'):'DevStateChange',
+        #re.compile(b'\[DevRecSm\]: execute(?P<execute>.*), CurState=(?P<curstate>.*)\\n'):'DevStateChange',
         re.compile(b'processSoftkey (?P<SoftkeyIndex>\d) DOWN IN\\n'):'SoftKeyDown',
         re.compile(b'processSoftkey (?P<SoftkeyIndex>\d) DOWN OUT\\n'):'SottKeyUp',
         re.compile(b'Received SOFT: (?P<SoftkeyIndex>\d)\\n'):'SoftKeyPressed',
         re.compile(b'setAudioPath \((?P<Path>.*)\)\\n'):'AudioPath',		# HANDSET / SPEAKER / NONE
-        re.compile(b'DisplayTask:\? - (?P<State1>.*)=(?P<Active1>[false|true])\\n'):'DisplayState',
         re.compile(b'DisplayTask:\? - Active Call Count: (?P<Num>\d)\\n'):'ActiveCallCount',
-        re.compile(b'DisplayTask:\? - (?P<State1>.*)=(?P<Active1>[false|true]) (?P<State2>.*)=(?P<Active2>[false|true])\\n'):'DisplayStateRunning',
+        re.compile(b'DisplayTask:\? - ([a-zA-Z]+)=(true|false) ([a-zA-Z]+)=(true|false)\\n'):'DisplayState',
+        re.compile(b'DisplayTask:\? - ([a-zA-Z]+)=(true|false)\\n'):'DisplayState',
         re.compile(b'InputManager:\? - Received DTMF: (?P<Num>\d+)\\n'):'ReceivedDTMF',
         re.compile(b'Notifying model of controller with name Line-(?P<LineNum>\d+)  event \d+\\n'):'LineUsed',
         re.compile(b'setOverviewCallAndLineState - DN=(?P<DN>\d+) lineState=(?P<LineState>.*) old lineWeight=.* new lineWeight=.*\\n'):'',
