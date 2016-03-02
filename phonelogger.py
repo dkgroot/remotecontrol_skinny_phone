@@ -62,13 +62,16 @@ def main():
     parser.add_option('-p', '--password', action='store', type='string', dest='password', default='cisco', help='ssh password to connect to phone')
     parser.add_option('-a', '--shelluser', action='store', type='string', dest='shelluser', default='default', help='shell username to login to the phone')
     parser.add_option('-b', '--shellpass', action='store', type='string', dest='shellpasswd', default='user', help='shell password to login to the phone')
+    parser.add_option('-l', '--logfile', action='store', type='string', dest='logfile', help='log ssh output to logfile')
     (options, args) = parser.parse_args()    
     if len(args) != 1:
             parser.error('incorrect number of arguments')
     hostname = args[0]
     
     # Call SccpLogger Library
-    sccp = SccpLogger(hostname, kwargs=vars(options))
+    #pprint (vars(options))
+    #exit()
+    sccp = SccpLogger(hostname, vars(options))
     sccp.connect()
     sccp.waitforevents(events)
 

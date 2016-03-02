@@ -16,18 +16,19 @@ except ImportError:
    support it. Pexpect is intended for UNIX-like operating systems.''')
    
 class SccpLogger:
-    def __init__(self, hostname, **kwargs):
+    def __init__(self, hostname, iterable=(), **kwargs):
+      self.__dict__.update(iterable, **kwargs)
       self.hostname = hostname
-      self.username = kwargs.get('username','cisco')
-      self.password = kwargs.get('password','cisco')
-      self.shelluser = kwargs.get('shelluser','default')
-      self.shellpasswd = kwargs.get('shellpasswd','user')
       self.waiting4events = False
-    
+   
     def connect(self, timeout=None, maxread=200):
       try:
         print('connecting via ssh to %s...' %self.hostname)
         self.ssh = spawn('./dbclient -y -y -s %s@%s' %(self.username, self.hostname), timeout=timeout, maxread=maxread)
+        if self.logfile != None:
+            fout = open(self.logfile,'bw')
+            self.ssh.logfile_read = fout
+            print ("sending output to %s" %options.logfile)
         self.ssh.expect ('password:')
         self.ssh.sendline (self.password)
         print('connected')
