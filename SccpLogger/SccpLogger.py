@@ -7,7 +7,7 @@ try:
     from subprocess import Popen, PIPE
     from pexpect import ExceptionPexpect, TIMEOUT, EOF, spawn
     from pprint import pprint
-    from SccpLogger import TONES, OPCODES
+    from SccpLogger import TONES, TONEDIRECTION, OPCODES
 except ImportError:
     err = sys.exc_info()[1]
     raise ImportError(str(err) + '''
@@ -16,12 +16,12 @@ except ImportError:
    support it. Pexpect is intended for UNIX-like operating systems.''')
    
 class SccpLogger:
-    def __init__(self, hostname, username='cisco', password='cisco', shelluser='default', shellpasswd='user'):
+    def __init__(self, hostname, **kwargs):
       self.hostname = hostname
-      self.username = username
-      self.password = password
-      self.shelluser = shelluser
-      self.shellpasswd = shellpasswd
+      self.username = kwargs.get('username','cisco')
+      self.password = kwargs.get('password','cisco')
+      self.shelluser = kwargs.get('shelluser','default')
+      self.shellpasswd = kwargs.get('shellpasswd','user')
       self.waiting4events = False
     
     def connect(self, timeout=None, maxread=200):
@@ -115,6 +115,9 @@ class SccpLogger:
         
     def lookup_tone(self, tone):
         return TONES[tone]
+
+    def lookup_tonedirection(self, dir):
+        return TONEDIRECTION[dir]
 
 if __name__ == '__main__':
     def handle_read(ssh, index, child_result_list):
