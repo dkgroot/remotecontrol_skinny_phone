@@ -10,24 +10,23 @@ def main():
        if ssh.match:
            opcode = int(ssh.match.group(2), 16)
            if opcode != 256: # Skip Keepalive
-               print('Read: %s(%x), length:%d' %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
+               print("'Read':{'msg':'%s','length':%d}" %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
 
     def handle_write(ssh, index, child_result_list):
        if ssh.match:
            opcode = int(ssh.match.group(2), 16)
            if opcode != 0: # Skip KeepaliveAck
-               print('Written: %s(%x), length:%d' %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
+               print("'Written':{'msg':'%s','length':%d}" %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
 
     def handle_tone(ssh, index, child_result_list):
        if ssh.match:
            tone = int(ssh.match.group(2))
            dir = int(ssh.match.group(3))
-           print('%s Tone: %s, direction:%s' %(ssh.match.group(1).decode('utf-8'), sccp.lookup_tone(tone), sccp.lookup_tonedirection(dir)))
-           #, tone, ssh.match.group(3).decode('utf-8')))
+           print("'Tone':{'State':'%s','Type':'%s','Direction':'%s'}" %(ssh.match.group(1).decode('utf-8'), sccp.lookup_tone(tone), sccp.lookup_tonedirection(dir)))
 
     events = {
-        re.compile(b'Read Sccp Length: (?P<length>\d+) messageType: (?P<type>0x[0-9a-fA-F]+) avalable:'):handle_read,
-        re.compile(b'Writing Sccp Length: (?P<length>\d+) for SCCP MSG: (?P<type>0x[0-9a-fA-F]+)\\n'):handle_write,
+        #re.compile(b'Read Sccp Length: (?P<length>\d+) messageType: (?P<type>0x[0-9a-fA-F]+) avalable:'):handle_read,
+        #re.compile(b'Writing Sccp Length: (?P<length>\d+) for SCCP MSG: (?P<type>0x[0-9a-fA-F]+)\\n'):handle_write,
         
         # device control
         re.compile(b'processSoftkey (?P<SoftkeyIndex>\d) DOWN IN\\n'):'SoftKeyDown',
@@ -39,21 +38,22 @@ def main():
         re.compile(b'DisplayTask:\? - ([a-zA-Z]+)=(true|false)\\n'):'DisplayState',
         re.compile(b'InputManager:\? - Received DTMF: (?P<Num>\d+)\\n'):'ReceivedDTMF',
         re.compile(b'Notifying model of controller with name Line-(?P<LineNum>\d+)  event \d+\\n'):'LineUsed',
-        re.compile(b'setOverviewCallAndLineState - DN=(?P<DN>\d+) lineState=(?P<LineState>.*) old lineWeight=.* new lineWeight=.*\\n'):'',
+        re.compile(b'setOverviewCallAndLineState - DN=(?P<DN>\d+) lineState=(?P<LineState>.*) old lineWeight=.* new lineWeight=.*\\n'):'CallAndLineState',
         re.compile(b'setText \( "(?P<Text>.*)" \)\\n'):'StatusPrompt',		# Ring out / Call Proceed / Connected / Your current options
         
         # call control
         re.compile(b'Tone-AUDIBLE FEEDBACK: (?P<State>.*):\(ToneType: (?P<Type>\d+), ToneDir: (?P<Direction>\d+)\)\\n'):handle_tone,
-        re.compile(b'callState - CALL STATE IS(?P<State>\S*)\\n'):'callstate',
+        re.compile(b'callState - CALL STATE IS  =(?P<State>.*)\\n'):'CallState',
         re.compile(b'Call View: Call-(?P<CallNum>\d+) draw\\n'):'CallView',
+        re.compile(b'processSoftkey (?P<SoftKey>\d) (?P<UpDown>UP|DOWN) (?P<InOut>IN|OUT)\\n'):'SoftKey',
         
         # rtp flow
-        re.compile(b'MediaTermination_open(?P<Gress>.*)\\n'):'mediatermination',
-        re.compile(b'STREAM- (?P<Gress>.*)\\n'):'stream',
-        re.compile(b'(?P<ORC>In ORC Bit Rate.*)\\n'):'openreceivechannel',
-        re.compile(b'(?P<SMT>In SMT Bit Rate.*)\\n'):'startmediatransmission',
-        re.compile(b'openEgressChannel, multicastListenIp=(?P<MultiCastIP>.*), localPort=(?P<Port>\d+), mediaPayloadType=(?P<Type>\d)\\n'):'openEgressChannel',
-        re.compile(b'openIngressChannel, remoteIpAddr=(?P<IP>.*), remotePort=(?P<Port>\d+), mediaPayloadType=(?P<Type>\d)\\n'):'openIngressChannel',
+        re.compile(b'MediaTermination_open(?P<Gress>.*)\\n'):'MediaTermination',
+        re.compile(b'STREAM- (?P<Gress>.*)\\n'):'Stream',
+        re.compile(b'(?P<ORC>In ORC Bit Rate.*)\\n'):'OpenReceiveChannel',
+        re.compile(b'(?P<SMT>In SMT Bit Rate.*)\\n'):'StartMediaTransmission',
+        re.compile(b'openEgressChannel, multicastListenIp=(?P<MultiCastIP>.*), localPort=(?P<Port>\d+), mediaPayloadType=(?P<Type>\d)\\n'):'OpenEgressChannel',
+        re.compile(b'openIngressChannel, remoteIpAddr=(?P<IP>.*), remotePort=(?P<Port>\d+), mediaPayloadType=(?P<Type>\d)\\n'):'OpenIngressChannel',
     }
 
     # Parse Command Line Options    

@@ -26,9 +26,9 @@ class SccpLogger:
         print('connecting via ssh to %s...' %self.hostname)
         self.ssh = spawn('./dbclient -y -y -s %s@%s' %(self.username, self.hostname), timeout=timeout, maxread=maxread)
         if self.logfile != None:
-            fout = open(self.logfile,'bw')
-            self.ssh.logfile_read = fout
-            print ("sending output to %s" %options.logfile)
+            self.fout = open(self.logfile,'bw')
+            self.ssh.logfile_read = self.fout
+            print ("sending output to %s" %self.logfile)
         self.ssh.expect ('password:')
         self.ssh.sendline (self.password)
         print('connected')
@@ -63,11 +63,11 @@ class SccpLogger:
 
     def handle_returnstr(self, index, child_result_list, returnstr):
         if self.ssh.match and self.ssh.match.lastgroup:
-            print ("%s:{%s}" %(returnstr, ','.join("'%s':'%s'" %(key,value.decode("utf-8")) for key,value in self.ssh.match.groupdict().items())))
+            print ("'%s':{%s}" %(returnstr, ','.join("'%s':'%s'" %(key,value.decode("utf-8")) for key,value in self.ssh.match.groupdict().items())))
         elif self.ssh.match and self.ssh.match.lastindex:
-            print ("%s:[%s]" %(returnstr, ','.join(repr(match.decode("utf-8")) for match in self.ssh.match.groups())))
+            print ("'%s':[%s]" %(returnstr, ','.join(repr(match.decode("utf-8")) for match in self.ssh.match.groups())))
         else:
-            print ("%s" %(returnstr))
+            print ("'%s'" %(returnstr))
     
     def waitforevents(self, events, timeout=None):
         if not self.ssh.isalive():
@@ -110,6 +110,8 @@ class SccpLogger:
             self.ssh.expect('$')
             self.ssh.sendline('exit')
             self.ssh.close()
+        if self.fout:
+            fout.close()
 
     def lookup_opcode(self, opcode):
         return OPCODES[opcode]
