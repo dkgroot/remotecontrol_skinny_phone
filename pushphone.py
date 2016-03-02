@@ -7,6 +7,45 @@ PHONE_EXECUTE_HEADER = '''<CiscoIPPhoneExecute>'''
 EXECUTE_ITEM = '''<ExecuteItem Priority="0" URL="%(url)s"/>'''
 PHONE_EXECUTE_FOOTER = '''</CiscoIPPhoneExecute>'''
 
+URIS = '''
+Dial:n
+EditDial:n
+Init:CallHistory
+Init:Services
+Init:Messages
+Init:Directories
+Play:f
+Display:Off:t
+Display:On:t
+Display:Default
+Key:Line1 to Key:Line34
+Key:Soft1 to Key:Soft5
+Key:Headset
+Key:Speaker
+Key:Hold 
+Key:Mute
+Key:KeyPad0 to Key:KeyPad9
+Key:KeyPadStar
+Key:KeyPadPound
+Key:Info
+Key:Messages
+Key:Services
+Key:Directories
+Key:Settings
+Key:AppMenu
+Key:VolDwn
+Key:VolUp
+Key:NavSelect
+Key:NavLeft
+Key:NavRight
+Key:NavUp
+Key:NavDwn
+RTPRx:i:p:v
+RTPTx:i:p
+RTPMRx:i:p:v
+RTPMTx:i:p
+'''
+
 def create_execute_url(url):
     push_xml = PHONE_EXECUTE_HEADER + EXECUTE_ITEM % {'url': url} + PHONE_EXECUTE_FOOTER
     return push_xml
