@@ -111,7 +111,7 @@ class SccpLogger:
             self.ssh.sendline('exit')
             self.ssh.close()
         if self.fout:
-            fout.close()
+            self.fout.close()
 
     def lookup_opcode(self, opcode):
         return OPCODES[opcode]
