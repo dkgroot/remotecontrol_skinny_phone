@@ -4,6 +4,8 @@ try:
     import re
     import types
     import time
+    import requests
+    import importlib
     from subprocess import Popen, PIPE
     from pexpect import ExceptionPexpect, TIMEOUT, EOF, spawn
     from pprint import pprint
@@ -19,9 +21,11 @@ class SccpLogger:
       self.ssh = None
       self.__dict__.update(iterable, **kwargs)
       self.hostname = hostname
-      self.waiting4events = False
       self.logfile = None
-  
+      self.model = self.__import_model()
+      self.waiting4events = False
+      self.tracing = False
+      
     def __del__(self):
       self.disconnect()
                
@@ -31,51 +35,68 @@ class SccpLogger:
         self.ssh.expect ('password:',clienttimeout)
         self.ssh.sendline (self.password)
 
+    def __retrieve_device_modelnumber(self):
+        url = 'http://%s/DeviceInformationX' %self.hostname
+        r = requests.get(url, auth=(self.username, self.password))
+        modelnumber = re.search('<modelNumber>(.*)</modelNumber>', r.text)
+        if modelnumber:
+            return modelnumber.group(1)
+        else:
+            raise Exception("no modelnumber found in '%s'", r.text)
+        
+    def __import_model(self):
+        self.modelnumber = self.__retrieve_device_modelnumber()
+        self.model_series = "none"
+        if self.modelnumber.startswith("CP-89"):
+            self.model_series = "89xx"
+        elif self.modelnumber.startswith("CP-797"):
+            self.model_series = "797x"
+        else:
+            raise Exception("No device model file available for : %s" %self.modelnumber)
+        model = importlib.import_module("SccpLogger.models.%s" %self.model_series)  
+        return model
+        
+    def get_modelnumber(self):
+        return self.modelnumber
+
     def start_logging(self, logfilename=None):
         if logfilename != None:
             if self.logfile is None:
                 self.logfile = open(self.logfilename,'bw')
             self.ssh.logfile_read = self.logfile
             self.logfilename = logfilename
-
+            
     def stop_logging(self):
         self.ssh.logfile_read = None
         if self.logfile:
             self.logfile.close()
-
-    def login(self, clienttimeout=2):
-        self.ssh.expect ('login:',clienttimeout)
-        self.ssh.sendline (self.shelluser)
-        self.ssh.expect ('password:',clienttimeout)
-        self.ssh.sendline (self.shellpasswd)
     
-    def setup_debug(self, clienttimeout=2):   
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('settmask -k')	# stop kernel level logging
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('settmask -s')	# stop process level logging
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('debugsh')
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('jvm logging level NONE')	# stop jvm level logging
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('debug jvm SCCP debug')
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('debug jvm PushService debug')
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('debug jvm XML debug')
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline('quit')
+    def __parse_expect_reply_list(self, list, clienttimeout=6):
+        for entry in list:
+            #print("%(expect)s, %(reply)s" %entry)
+            if entry['expect']:
+                self.ssh.expect(entry['expect'], clienttimeout)
+            if entry['reply']:
+                self.ssh.sendline(entry['reply'])
 
-    def start_strace(self, clienttimeout=2):
-        self.ssh.expect ('$',clienttimeout)
-        self.ssh.sendline ('strace')
+    def login(self):
+        self.__parse_expect_reply_list(self.model.LOGIN)
+    
+    def setup_debug(self):   
+        self.__parse_expect_reply_list(self.model.SETUP_DEBUG)
 
-    def stop_strace(self, clienttimeout=2):
-        self.ssh.send('^C')
-        self.ssh.expect('$', clienttimeout)
+    def start_strace(self):
+        self.__parse_expect_reply_list(self.model.START_LOGGING)
+        self.tracing = True
 
-    def generic_event_handler(self, index, child_result_list, returnstr):
+    def stop_strace(self):
+        self.__parse_expect_reply_list(self.model.STOP_LOGGING)
+        self.tracing = False
+
+    def reset_debug(self):
+        self.__parse_expect_reply_list(self.model.RESET_DEBUG)
+
+    def __generic_event_handler(self, index, child_result_list, returnstr):
         if self.ssh.match.lastgroup:
             content = {k: v.decode("utf-8") for k, v in self.ssh.match.groupdict().items()}
         elif self.ssh.match.lastindex:
@@ -83,6 +104,9 @@ class SccpLogger:
         else:
             content = {}
         return returnstr, content
+        
+    def get_model_event_patternss(self):
+        return self.model.EVENT_PATTERNS
     
     def waitforevents(self, events, timeout=None):
         if not self.ssh or not self.ssh.isalive():
@@ -97,7 +121,7 @@ class SccpLogger:
             try:
                 index = self.ssh.expect_list(compiled_pattern_list, timeout)
                 if isinstance(responses[index], self.ssh.allowed_string_types):
-                    callback_result = self.generic_event_handler(index, child_result_list, responses[index])
+                    callback_result = self.__generic_event_handler(index, child_result_list, responses[index])
                 elif isinstance(responses[index], types.FunctionType):
                     callback_result = responses[index](self.ssh, index, child_result_list)
                 if callback_result:
@@ -124,14 +148,20 @@ class SccpLogger:
         self.waiting4events = False
     
     def disconnect(self):
-        if self.ssh:
-            if not self.ssh.closed:
+        if self.ssh and not self.ssh.closed:
+            try:
                 if self.waiting4events:
                     self.stopwaiting()
-                self.stop_strace()
+                if self.tracing:
+                    self.stop_strace()
+                self.reset_debug()
                 self.stop_logging()
-                self.ssh.sendline('exit')
+                self.__parse_expect_reply_list(self.model.DISCONNECT)
                 self.ssh.close()
+            except KeyboardInterrupt:
+                exit()
+            except Exception as e:
+                pass
 
     def lookup_opcode(self, opcode):
         return OPCODES[opcode]

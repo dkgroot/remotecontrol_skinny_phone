@@ -1,0 +1,9 @@
+SERIES = "none"
+LOGIN = []
+SETUP_DEBUG = []
+RESET_DEBUG = []
+START_LOGGING = []
+STOP_LOGGING = []
+
+EVENT_PATTERNS = {
+}
