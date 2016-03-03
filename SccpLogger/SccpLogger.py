@@ -4,6 +4,7 @@ try:
     import os
     import re
     import types
+    import time
     from subprocess import Popen, PIPE
     from pexpect import ExceptionPexpect, TIMEOUT, EOF, spawn
     from pprint import pprint
@@ -14,52 +15,61 @@ except ImportError:
 
    A critical module was not found. Probably this operating system does not
    support it. Pexpect is intended for UNIX-like operating systems.''')
-   
 class SccpLogger:
     def __init__(self, hostname, iterable=(), **kwargs):
       self.__dict__.update(iterable, **kwargs)
       self.hostname = hostname
       self.waiting4events = False
    
-    def connect(self, timeout=None, maxread=200):
-      try:
-        print('connecting via ssh to %s...' %self.hostname)
+    def connect(self, timeout=None, maxread=200, clienttimeout=20):
         self.ssh = spawn('./dbclient -y -y -s %s@%s' %(self.username, self.hostname), timeout=timeout, maxread=maxread)
-        if self.logfile != None:
-            self.fout = open(self.logfile,'bw')
-            self.ssh.logfile_read = self.fout
-            print ("sending output to %s" %self.logfile)
-        self.ssh.expect ('password:')
+        self.start_logging(self.logfile)
+        self.ssh.expect ('password:',clienttimeout)
         self.ssh.sendline (self.password)
-        print('connected')
-        self.ssh.expect ('login:')
+
+    def start_logging(self, logfile=None):
+        if logfile != None:
+            if self.fout is None:
+                self.fout = open(self.logfile,'bw')
+            self.ssh.logfile_read = self.fout
+            self.logfile = logfile
+
+    def stop_logging(self):
+        self.ssh.logfile_read = None
+        if self.fout:
+            self.fout.close()
+
+    def login(self, clienttimeout=2):
+        self.ssh.expect ('login:',clienttimeout)
         self.ssh.sendline (self.shelluser)
-        self.ssh.expect ('password:')
+        self.ssh.expect ('password:',clienttimeout)
         self.ssh.sendline (self.shellpasswd)
-        print('logged in to shell. setting up debug environment...')
-        self.ssh.expect ('$')
+    
+    def setup_debug(self, clienttimeout=2):   
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('settmask -k')	# stop kernel level logging
-        self.ssh.expect ('$')
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('settmask -s')	# stop process level logging
-        self.ssh.expect ('$')
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('debugsh')
-        self.ssh.expect ('$')
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('jvm logging level NONE')	# stop jvm level logging
-        self.ssh.expect ('$')
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('debug jvm SCCP debug')
-        self.ssh.expect ('$')
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('debug jvm PushService debug')
-        self.ssh.expect ('$')
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('debug jvm XML debug')
-        self.ssh.expect ('$')
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline('quit')
-        print('starting strace...')
-        self.ssh.expect ('$')
+
+    def start_strace(self, clienttimeout=2):
+        self.ssh.expect ('$',clienttimeout)
         self.ssh.sendline ('strace')
-        print('ready to process events...\n')
-      except ExceptionPexpect as e:
-        print('ssh connection failed')
-        print(e)
+
+    def stop_strace(self, clienttimeout=2):
+        self.ssh.send('^C')
+        self.ssh.expect('$', clienttimeout)
 
     def handle_returnstr(self, index, child_result_list, returnstr):
         if self.ssh.match and self.ssh.match.lastgroup:
@@ -106,12 +116,10 @@ class SccpLogger:
         if not self.ssh.closed:
             if self.waiting4events:
                 self.stopwaiting()
-            self.ssh.send('^C')
-            self.ssh.expect('$')
+            self.stop_strace()
+            self.stop_logging()
             self.ssh.sendline('exit')
             self.ssh.close()
-        if self.fout:
-            self.fout.close()
 
     def lookup_opcode(self, opcode):
         return OPCODES[opcode]
@@ -139,11 +147,29 @@ if __name__ == '__main__':
     events = {
         re.compile(b'Read Sccp Length: (?P<length>\d+) messageType: (?P<type>0x[0-9a-fA-F]+) avalable:'):handle_read,
         re.compile(b'Writing Sccp Length: (?P<length>\d+) for SCCP MSG: (?P<type>0x[0-9a-fA-F]+)\\n'):handle_write,
-        re.compile(b'\[DevRecSm\]: execute(?P<execute>.*), CurState=(?P<curstate>.*)\\n'):'DevStateChange',
         re.compile(b'processSoftkey (?P<SoftkeyIndex>\d) DOWN IN\\n'):'SoftKeyDown',
         re.compile(b'processSoftkey (?P<SoftkeyIndex>\d) DOWN OUT\\n'):'SottKeyUp',
+        re.compile(b'callState - CALL STATE IS  =(?P<State>.*)\\n'):'CallState',
     }
 
     sccp = SccpLogger('10.15.15.205')
-    sccp.connect()
-    sccp.waitforevents(events)
+    sccp = SccpLogger(hostname, vars(options))
+    try:
+        print("connecting to %s..." %hostname)
+        sccp.connect()
+        print("connected")
+        sccp.login()
+        print('logged in to shell. setting up debug environment...')
+        sccp.setup_debug()
+        print('starting strace...')
+        sccp.start_strace()
+        print('ready to process events...\n')
+        sccp.waitforevents(events)
+    except TIMEOUT:
+        print("Connection timed out")
+    except EOF:
+        print("Disconnect from phone")
+    except KeyboardInterrupt:
+        print("Interrupted by User")
+    except Exception as e:
+        print("Exception occured: %s" %e)

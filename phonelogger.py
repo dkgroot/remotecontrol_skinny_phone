@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import re
-from SccpLogger.SccpLogger import SccpLogger
+from SccpLogger.SccpLogger import SccpLogger, EOF, TIMEOUT
 from pprint import pprint
 from optparse import OptionParser
 
@@ -69,12 +69,27 @@ def main():
     hostname = args[0]
     
     # Call SccpLogger Library
-    #pprint (vars(options))
-    #exit()
     sccp = SccpLogger(hostname, vars(options))
-    sccp.connect()
-    sccp.waitforevents(events)
-
+    try:
+        print("connecting to %s..." %hostname)
+        sccp.connect()
+        print("connected")
+        sccp.login()
+        print('logged in to shell. setting up debug environment...')
+        sccp.setup_debug()
+        print('starting strace...')
+        sccp.start_strace()
+        print('ready to process events...\n')
+        sccp.waitforevents(events)
+    except TIMEOUT:
+        print("Connection timed out")
+    except EOF:
+        print("Disconnect from phone")
+    except KeyboardInterrupt:
+        print("Interrupted by User")
+    except Exception as e:
+        print("Exception occured: %s" %e)
+        
 if __name__ == '__main__':
     main()
     
