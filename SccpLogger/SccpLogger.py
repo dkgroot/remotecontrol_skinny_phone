@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 try:
     import sys
     import os
@@ -20,24 +19,28 @@ class SccpLogger:
       self.__dict__.update(iterable, **kwargs)
       self.hostname = hostname
       self.waiting4events = False
-   
+      self.logfile = None
+  
+    def __del__(self):
+      self.disconnect()
+               
     def connect(self, timeout=None, maxread=200, clienttimeout=20):
         self.ssh = spawn('./dbclient -y -y -s %s@%s' %(self.username, self.hostname), timeout=timeout, maxread=maxread)
-        self.start_logging(self.logfile)
+        self.start_logging(self.logfilename)
         self.ssh.expect ('password:',clienttimeout)
         self.ssh.sendline (self.password)
 
-    def start_logging(self, logfile=None):
-        if logfile != None:
-            if self.fout is None:
-                self.fout = open(self.logfile,'bw')
-            self.ssh.logfile_read = self.fout
-            self.logfile = logfile
+    def start_logging(self, logfilename=None):
+        if logfilename != None:
+            if self.logfile is None:
+                self.logfile = open(self.logfilename,'bw')
+            self.ssh.logfile_read = self.logfile
+            self.logfilename = logfilename
 
     def stop_logging(self):
         self.ssh.logfile_read = None
-        if self.fout:
-            self.fout.close()
+        if self.logfile:
+            self.logfile.close()
 
     def login(self, clienttimeout=2):
         self.ssh.expect ('login:',clienttimeout)
@@ -80,7 +83,7 @@ class SccpLogger:
             content = {}
         return returnstr, content
     
-    def waitforevents(self, events, timeout=None, returnOnMatch=False):
+    def waitforevents(self, events, timeout=None):
         if not self.ssh.isalive():
             raise EOF("Not Connected")
         patterns = list(events.keys())
@@ -96,12 +99,8 @@ class SccpLogger:
                     callback_result = self.generic_event_handler(index, child_result_list, responses[index])
                 elif isinstance(responses[index], types.FunctionType):
                     callback_result = responses[index](self.ssh, index, child_result_list)
-                
                 if callback_result:
-                    if returnOnMatch:
-                        return callback_result
-                    else:
-                        yield callback_result
+                    yield callback_result
             except TIMEOUT:
                 child_result_list.append(self.ssh.before)
                 break
@@ -112,6 +111,13 @@ class SccpLogger:
                 self.disconnect()
                 break
             child_result = self.ssh.string_type().join(child_result_list)
+
+    def waitforevent(self, re_pattern, timeout=None):
+        if not isinstance(re_pattern, self.ssh.allowed_string_types) and not isinstance(re_pattern, bytes):
+            raise Exception('re_pattern needs to be an ascii string or a byte sequence')    
+        events = {re.compile(re_pattern):'matched'}
+        for event, content in self.waitforevents(events, timeout):
+            return event, content
     
     def stopwaiting(self):
         self.waiting4events = False
@@ -169,7 +175,7 @@ if __name__ == '__main__':
         print('starting strace...')
         sccp.start_strace()
         print('ready to process events...\n')
-        for event,content in sccp.waitforevents(events, timeout=30, returnOnMatch=False):
+        for event,content in sccp.waitforevents(events, timeout=20):
               print("'%s':{%s}" %(event, ','.join("'%s':'%s'" %(key, value) for key,value in content.items())))
     except TIMEOUT:
         print("Connection timed out")
