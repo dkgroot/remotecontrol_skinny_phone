@@ -5,24 +5,24 @@ from pprint import pprint
 from optparse import OptionParser
 
 def main():
-    
     def handle_read(ssh, index, child_result_list):
-       if ssh.match:
-           opcode = int(ssh.match.group(2), 16)
-           if opcode != 256: # Skip Keepalive
-               print("'Read':{'msg':'%s','length':%d}" %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
+       opcode = int(ssh.match.group(2), 16)
+       if opcode == 256: # Skip KeepAlive
+           return None
+       else:
+           yield 'Read', {'Read':sccp.lookup_opcode(opcode),'Length':int(ssh.match.group(1))}
 
     def handle_write(ssh, index, child_result_list):
-       if ssh.match:
-           opcode = int(ssh.match.group(2), 16)
-           if opcode != 0: # Skip KeepaliveAck
-               print("'Written':{'msg':'%s','length':%d}" %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
-
+       opcode = int(ssh.match.group(2), 16)
+       if opcode == 0: # Skip KeepaliveAck
+           return None
+       else:
+           return 'Write', {'Written':sccp.lookup_opcode(opcode),'Length':int(ssh.match.group(1))}
+    
     def handle_tone(ssh, index, child_result_list):
-       if ssh.match:
-           tone = int(ssh.match.group(2))
-           dir = int(ssh.match.group(3))
-           print("'Tone':{'State':'%s','Type':'%s','Direction':'%s'}" %(ssh.match.group(1).decode('utf-8'), sccp.lookup_tone(tone), sccp.lookup_tonedirection(dir)))
+       tone = int(ssh.match.group(2))
+       dir = int(ssh.match.group(3))
+       return 'Tone', {'State':ssh.match.group(1).decode('utf-8'),'Type':sccp.lookup_tone(tone),'Direction':sccp.lookup_tonedirection(dir)}
 
     events = {
         #re.compile(b'Read Sccp Length: (?P<length>\d+) messageType: (?P<type>0x[0-9a-fA-F]+) avalable:'):handle_read,
@@ -80,7 +80,8 @@ def main():
         print('starting strace...')
         sccp.start_strace()
         print('ready to process events...\n')
-        sccp.waitforevents(events)
+        for event,content in sccp.waitforevents(events, timeout=30, returnOnMatch=False):
+              print("'%s':{%s}" %(event, ','.join("'%s':'%s'" %(key, value) for key,value in content.items())))
     except TIMEOUT:
         print("Connection timed out")
     except EOF:

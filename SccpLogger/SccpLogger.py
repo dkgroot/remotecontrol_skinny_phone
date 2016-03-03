@@ -71,18 +71,18 @@ class SccpLogger:
         self.ssh.send('^C')
         self.ssh.expect('$', clienttimeout)
 
-    def handle_returnstr(self, index, child_result_list, returnstr):
-        if self.ssh.match and self.ssh.match.lastgroup:
-            print ("'%s':{%s}" %(returnstr, ','.join("'%s':'%s'" %(key,value.decode("utf-8")) for key,value in self.ssh.match.groupdict().items())))
-        elif self.ssh.match and self.ssh.match.lastindex:
-            print ("'%s':[%s]" %(returnstr, ','.join(repr(match.decode("utf-8")) for match in self.ssh.match.groups())))
+    def generic_event_handler(self, index, child_result_list, returnstr):
+        if self.ssh.match.lastgroup:
+            content = {k: v.decode("utf-8") for k, v in self.ssh.match.groupdict().items()}
+        elif self.ssh.match.lastindex:
+            content = {k: v.decode("utf-8") for k,v in enumerate(self.ssh.match.groups())}
         else:
-            print ("'%s'" %(returnstr))
+            content = {}
+        return returnstr, content
     
-    def waitforevents(self, events, timeout=None):
+    def waitforevents(self, events, timeout=None, returnOnMatch=False):
         if not self.ssh.isalive():
-            print('not connected')
-            return
+            raise EOF("Not Connected")
         patterns = list(events.keys())
         responses = list(events.values())
         compiled_pattern_list = self.ssh.compile_pattern_list(patterns)
@@ -93,10 +93,15 @@ class SccpLogger:
             try:
                 index = self.ssh.expect_list(compiled_pattern_list, timeout)
                 if isinstance(responses[index], self.ssh.allowed_string_types):
-                    callback_result = self.handle_returnstr(index, child_result_list, responses[index])
-                if isinstance(responses[index], types.FunctionType):
+                    callback_result = self.generic_event_handler(index, child_result_list, responses[index])
+                elif isinstance(responses[index], types.FunctionType):
                     callback_result = responses[index](self.ssh, index, child_result_list)
-                sys.stdout.flush()
+                
+                if callback_result:
+                    if returnOnMatch:
+                        return callback_result
+                    else:
+                        yield callback_result
             except TIMEOUT:
                 child_result_list.append(self.ssh.before)
                 break
@@ -109,7 +114,6 @@ class SccpLogger:
             child_result = self.ssh.string_type().join(child_result_list)
     
     def stopwaiting(self):
-        print("stopped waiting4events")
         self.waiting4events = False
     
     def disconnect(self):
@@ -132,16 +136,18 @@ class SccpLogger:
 
 if __name__ == '__main__':
     def handle_read(ssh, index, child_result_list):
-       if ssh.match:
-           opcode = int(ssh.match.group(2), 16)
-           if opcode != 256: # Skip Keepalive
-               print("Read: %s(%x), length:%d" %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
+       opcode = int(ssh.match.group(2), 16)
+       if opcode == 256: # Skip Keepalive
+           return None
+       else:
+           return 'Read', {'Read':sccp.lookup_opcode(opcode),'Length':int(ssh.match.group(1))}
 
     def handle_write(ssh, index, child_result_list):
-       if ssh.match:
-           opcode = int(ssh.match.group(2), 16)
-           if opcode != 0: # Skip KeepaliveAck
-               print("Written: %s(%x), length:%d" %(sccp.lookup_opcode(opcode), opcode, int(ssh.match.group(1))))
+       opcode = int(ssh.match.group(2), 16)
+       if opcode == 0: # Skip KeepaliveAck
+           return None
+       else:
+           return 'Write', {'Written':sccp.lookup_opcode(opcode),'Length':int(ssh.match.group(1))}
 
     # just an example of possible matches
     events = {
@@ -153,7 +159,6 @@ if __name__ == '__main__':
     }
 
     sccp = SccpLogger('10.15.15.205')
-    sccp = SccpLogger(hostname, vars(options))
     try:
         print("connecting to %s..." %hostname)
         sccp.connect()
@@ -164,7 +169,8 @@ if __name__ == '__main__':
         print('starting strace...')
         sccp.start_strace()
         print('ready to process events...\n')
-        sccp.waitforevents(events)
+        for event,content in sccp.waitforevents(events, timeout=30, returnOnMatch=False):
+              print("'%s':{%s}" %(event, ','.join("'%s':'%s'" %(key, value) for key,value in content.items())))
     except TIMEOUT:
         print("Connection timed out")
     except EOF:
