@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 import re
-from SccpLogger.SccpLogger import SccpLogger, EOF, TIMEOUT
 from pprint import pprint
 from optparse import OptionParser
+
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir) 
+
+from SccpLogger.SccpLogger import SccpLogger, EOF, TIMEOUT
 
 def main():
     def handle_read(ssh, index, child_result_list):
@@ -80,7 +86,7 @@ def main():
         print('starting strace...')
         sccp.start_strace()
         print('ready to process events...\n')
-        for event,content in sccp.waitforevents(events, timeout=20):
+        for event,content in sccp.waitforevents(events, timeout=None):
               print("'%s':{%s}" %(event, ','.join("'%s':'%s'" %(key, value) for key,value in content.items())))
     except TIMEOUT:
         print("Connection timed out")

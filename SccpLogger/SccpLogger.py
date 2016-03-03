@@ -16,6 +16,7 @@ except ImportError:
    support it. Pexpect is intended for UNIX-like operating systems.''')
 class SccpLogger:
     def __init__(self, hostname, iterable=(), **kwargs):
+      self.ssh = None
       self.__dict__.update(iterable, **kwargs)
       self.hostname = hostname
       self.waiting4events = False
@@ -25,7 +26,7 @@ class SccpLogger:
       self.disconnect()
                
     def connect(self, timeout=None, maxread=200, clienttimeout=20):
-        self.ssh = spawn('./dbclient -y -y -s %s@%s' %(self.username, self.hostname), timeout=timeout, maxread=maxread)
+        self.ssh = spawn('./bin/dbclient -y -y -s %s@%s' %(self.username, self.hostname), timeout=timeout, maxread=maxread)
         self.start_logging(self.logfilename)
         self.ssh.expect ('password:',clienttimeout)
         self.ssh.sendline (self.password)
@@ -84,7 +85,7 @@ class SccpLogger:
         return returnstr, content
     
     def waitforevents(self, events, timeout=None):
-        if not self.ssh.isalive():
+        if not self.ssh or not self.ssh.isalive():
             raise EOF("Not Connected")
         patterns = list(events.keys())
         responses = list(events.values())
@@ -123,13 +124,14 @@ class SccpLogger:
         self.waiting4events = False
     
     def disconnect(self):
-        if not self.ssh.closed:
-            if self.waiting4events:
-                self.stopwaiting()
-            self.stop_strace()
-            self.stop_logging()
-            self.ssh.sendline('exit')
-            self.ssh.close()
+        if self.ssh:
+            if not self.ssh.closed:
+                if self.waiting4events:
+                    self.stopwaiting()
+                self.stop_strace()
+                self.stop_logging()
+                self.ssh.sendline('exit')
+                self.ssh.close()
 
     def lookup_opcode(self, opcode):
         return OPCODES[opcode]
