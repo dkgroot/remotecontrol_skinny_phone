@@ -62,7 +62,7 @@ def main():
     parser.add_option('-p', '--password', action='store', type='string', dest='password', default='cisco', help='ssh password to connect to phone')
     parser.add_option('-a', '--shelluser', action='store', type='string', dest='shelluser', default='default', help='shell username to login to the phone')
     parser.add_option('-b', '--shellpass', action='store', type='string', dest='shellpasswd', default='user', help='shell password to login to the phone')
-    parser.add_option('-l', '--logfile', action='store', type='string', dest='logfile', help='log ssh output to logfile')
+    parser.add_option('-l', '--logfile', action='store', type='string', dest='logfilename', help='log ssh output to logfile')
     (options, args) = parser.parse_args()    
     if len(args) != 1:
             parser.error('incorrect number of arguments')
@@ -80,8 +80,9 @@ def main():
         print('starting strace...')
         sccp.start_strace()
         print('ready to process events...\n')
-        for event,content in sccp.waitforevents(events, timeout=30, returnOnMatch=False):
+        for event,content in sccp.waitforevents(events, timeout=20):
               print("'%s':{%s}" %(event, ','.join("'%s':'%s'" %(key, value) for key,value in content.items())))
+        sccp.disconnect()
     except TIMEOUT:
         print("Connection timed out")
     except EOF:
@@ -90,6 +91,7 @@ def main():
         print("Interrupted by User")
     except Exception as e:
         print("Exception occured: %s" %e)
+
         
 if __name__ == '__main__':
     main()
