@@ -185,3 +185,6 @@ if __name__ == '__main__':
         print("Interrupted by User")
     except Exception as e:
         print("Exception occured: %s" %e)
+    finally:
+        sccp.disconnect()
+        

@@ -82,7 +82,6 @@ def main():
         print('ready to process events...\n')
         for event,content in sccp.waitforevents(events, timeout=20):
               print("'%s':{%s}" %(event, ','.join("'%s':'%s'" %(key, value) for key,value in content.items())))
-        sccp.disconnect()
     except TIMEOUT:
         print("Connection timed out")
     except EOF:
@@ -91,7 +90,9 @@ def main():
         print("Interrupted by User")
     except Exception as e:
         print("Exception occured: %s" %e)
-
+    finally:
+        if sccp:
+            sccp.disconnect()
         
 if __name__ == '__main__':
     main()
