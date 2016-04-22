@@ -9,6 +9,7 @@ register a callback for
 
 Usage: 
 --------------------------------
+<pre>
 bin/phonelogger <hostname>
 Options:
   --version             show program's version number and exit
@@ -23,6 +24,7 @@ Options:
                         shell password to login to the phone
   -l LOGFILENAME, --logfile=LOGFILENAME
                         log ssh output to logfile
+</pre>
 
 Push Request to Phone:
 ----------------------
@@ -30,17 +32,21 @@ bin/pushphone shows how to use python to push an http/xml message to the phone.
 
 Run Tests:
 ------
+<pre>
 py.test-3 -s -v
 py.test-3 -s -v -k test_call98011_2
+</pre>
 
 Requirements:
 -------------
+<pre>
 python3
 dropbox ssh client called dbclient
 
 pexpect >= 3.1
 requests >= 2.2.1
 pytest >= 2.5.1
+</pre>
 
 You can satisfy these requirements using:
 <code>
@@ -53,7 +59,7 @@ Most of the cisco phones come with an older version of dropbear which is not
 compatible to the openssh client.
 For that reason i provided bin/dbclient which is a statically (x86_64) compiled version of dropbear ssh client
 if you need a version for a different platform, you need to download the dropbear ssh package and run
-<code>
+<pre>
 make PROGRAMS="dbclient" MULTI=1 STATIC=1
-</code>
+</pre>
 to create a new version of dbclient as a replacement
