@@ -51,6 +51,8 @@ class SccpLogger:
             self.model_series = "89xx"
         elif self.modelnumber.startswith("CP-797"):
             self.model_series = "797x"
+        elif self.modelnumber.startswith("CP-796"):
+            self.model_series = "796x"
         else:
             raise Exception("No device model file available for : %s" %self.modelnumber)
         model = importlib.import_module("SccpLogger.models.%s" %self.model_series)  
